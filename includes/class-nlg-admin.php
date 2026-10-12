@@ -53,7 +53,7 @@ class NLG_Admin {
 			return;
 		}
 		if ( ! NLG_Settings::api_key() ) {
-			echo '<div class="notice notice-warning"><p><strong>Lead Guard</strong> is not checking forms yet: add your API key under <a href="' . esc_url( self::page_url() ) . '">Settings &gt; Lead Guard</a>.</p></div>';
+			echo '<div class="notice notice-warning"><p><strong>Lead Guard</strong> is not checking forms yet: add your API key or connection code under <a href="' . esc_url( self::page_url() ) . '">Settings &gt; Lead Guard</a>.</p></div>';
 		} elseif ( ! class_exists( 'GFForms' ) ) {
 			echo '<div class="notice notice-warning"><p><strong>Lead Guard</strong> needs Gravity Forms, which is not active on this site.</p></div>';
 		}
@@ -123,7 +123,7 @@ class NLG_Admin {
 
 			<table class="widefat striped" style="max-width:720px;margin:1em 0">
 				<tbody>
-					<tr><th>API key</th><td><?php echo $key ? 'Saved' . ( NLG_Settings::key_in_config() ? ' in wp-config.php' : '' ) . ' (ends in ' . esc_html( substr( $key, -4 ) ) . ')' : '<strong>Missing.</strong> Paste it in the API key box below.'; ?></td></tr>
+					<tr><th>API key</th><td><?php echo wp_kses( self::key_status( $key ), array( 'strong' => array() ) ); ?></td></tr>
 					<tr><th>Gravity Forms</th><td><?php echo class_exists( 'GFForms' ) ? 'Active' : '<strong>Not active</strong>'; ?></td></tr>
 					<tr><th>Model</th><td><code><?php echo esc_html( NLG_Settings::model() ); ?></code></td></tr>
 					<tr><th>Weekly report goes to</th><td><?php echo esc_html( NLG_Settings::digest_to() ); ?></td></tr>
@@ -135,16 +135,16 @@ class NLG_Admin {
 				<?php settings_fields( 'nlg' ); ?>
 				<table class="form-table" role="presentation">
 					<tr>
-						<th scope="row"><label for="nlg-key">API key</label></th>
+						<th scope="row"><label for="nlg-key">API key or connection code</label></th>
 						<td>
 							<?php if ( NLG_Settings::key_in_config() ) : ?>
 								Set in wp-config.php, which overrides this box.
 							<?php else : ?>
-								<input id="nlg-key" type="password" name="<?php echo esc_attr( NLG_Settings::KEY_OPTION ); ?>" value="<?php echo $key ? esc_attr( NLG_Settings::KEY_MASK ) : ''; ?>" class="regular-text" autocomplete="new-password" placeholder="sk-ant-..." onfocus="this.select()">
+								<input id="nlg-key" type="password" name="<?php echo esc_attr( NLG_Settings::KEY_OPTION ); ?>" value="<?php echo $key ? esc_attr( NLG_Settings::KEY_MASK ) : ''; ?>" class="regular-text" autocomplete="new-password" placeholder="nlg1_... or sk-ant-..." onfocus="this.select()">
 								<?php if ( $key ) : ?>
-									<label style="margin-left:8px"><input type="checkbox" name="nlg_api_key_remove" value="1"> Remove saved key</label>
+									<label style="margin-left:8px"><input type="checkbox" name="nlg_api_key_remove" value="1"> Remove it</label>
 								<?php endif; ?>
-								<p class="description"><?php echo $key ? 'Key saved, ends in ' . esc_html( substr( $key, -4 ) ) . '. To replace it, click the box and paste a new key.' : 'From console.anthropic.com. The key is never shown again after you save it.'; ?></p>
+								<p class="description"><?php echo $key ? 'Saved. To replace it, click the box and paste a new one.' : 'Paste the connection code from Noble Digital, or your own Anthropic API key. It is never shown again after you save it.'; ?></p>
 							<?php endif; ?>
 						</td>
 					</tr>
@@ -245,6 +245,23 @@ class NLG_Admin {
 			<?php self::render_how_it_decides(); ?>
 		</div>
 		<?php
+	}
+
+	/** One line for the status table. Never shows the key or code itself. */
+	private static function key_status( $key ) {
+		if ( ! $key ) {
+			return '<strong>Missing.</strong> Paste the connection code or an API key in the box below.';
+		}
+		$where = NLG_Settings::key_in_config() ? ' in wp-config.php' : '';
+		$relay = NLG_Settings::relay( $key );
+		if ( ! $relay ) {
+			return 'Own key saved' . $where . ' (ends in ' . esc_html( substr( $key, -4 ) ) . ')';
+		}
+		$text = 'Connected through the Lead Guard relay (code for ' . esc_html( $relay['site'] ) . ', saved' . $where . ')';
+		if ( NLG_Settings::home_site() !== $relay['site'] ) {
+			$text .= '. <strong>This code was made for ' . esc_html( $relay['site'] ) . ', not ' . esc_html( NLG_Settings::home_site() ) . '.</strong> It still works, but switching off ' . esc_html( $relay['site'] ) . ' on the relay also switches off this site.';
+		}
+		return $text;
 	}
 
 	/** Plain-language explanation, so anyone looking at a held entry can see why. */

@@ -29,7 +29,7 @@ class NLG_Classifier {
 
 		$key = NLG_Settings::api_key();
 		if ( ! $key ) {
-			$result['error'] = 'No API key in wp-config.php';
+			$result['error'] = 'No API key or connection code';
 			return $result;
 		}
 
@@ -61,18 +61,7 @@ class NLG_Classifier {
 			),
 		);
 
-		$response = wp_remote_post(
-			self::ENDPOINT,
-			array(
-				'timeout' => (int) $timeout,
-				'headers' => array(
-					'x-api-key'         => $key,
-					'anthropic-version' => '2023-06-01',
-					'content-type'      => 'application/json',
-				),
-				'body'    => wp_json_encode( $body ),
-			)
-		);
+		$response = self::send( $body, $timeout );
 		$result['latency_ms'] = (int) round( ( microtime( true ) - $start ) * 1000 );
 
 		if ( is_wp_error( $response ) ) {
@@ -117,6 +106,37 @@ class NLG_Classifier {
 		$result['confidence'] = $parsed['confidence'];
 		$result['reason']     = isset( $parsed['reason'] ) ? mb_substr( (string) $parsed['reason'], 0, 500 ) : '';
 		return $result;
+	}
+
+	/**
+	 * Sends a Messages API request straight to Anthropic with the site's key, or through the
+	 * Lead Guard relay when the site holds a connection code instead.
+	 *
+	 * @return array|WP_Error
+	 */
+	public static function send( $body, $timeout ) {
+		$key   = NLG_Settings::api_key();
+		$relay = NLG_Settings::relay( $key );
+		if ( $relay ) {
+			$url     = $relay['url'] . '/v1/messages';
+			$headers = array( 'authorization' => 'Bearer ' . $key );
+		} else {
+			$url     = self::ENDPOINT;
+			$headers = array(
+				'x-api-key'         => $key,
+				'anthropic-version' => '2023-06-01',
+			);
+		}
+		$headers['content-type'] = 'application/json';
+
+		return wp_remote_post(
+			$url,
+			array(
+				'timeout' => (int) $timeout,
+				'headers' => $headers,
+				'body'    => wp_json_encode( $body ),
+			)
+		);
 	}
 
 	public static function schema() {
