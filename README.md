@@ -1,4 +1,4 @@
-# Noble Lead Guard 0.2.0
+# Noble Lead Guard 0.2.1
 
 Checks every Gravity Forms submission with Claude and holds back spam and sales pitches before the notification email goes out. Held-back entries stay in the form's Spam folder with a note saying why. Anything the AI isn't sure about, and anything it can't check (timeout, API outage), is emailed as normal.
 
