@@ -1,0 +1,63 @@
+# Publishes a release whenever main has a version that hasn't been released yet.
+# Sites running Lead Guard check the latest release twice a day and update from it.
+# To ship: bump "Version:" and NLG_VERSION in noble-lead-guard.php, then push to main.
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version
+        id: version
+        run: |
+          header=$(grep -m1 -E '^\s*\*\s*Version:' noble-lead-guard.php | sed -E 's/.*Version:[[:space:]]*//' | tr -d '[:space:]')
+          constant=$(grep -m1 "define( 'NLG_VERSION'" noble-lead-guard.php | sed -E "s/.*'NLG_VERSION', '([^']+)'.*/\1/")
+          if [ -z "$header" ] || [ "$header" != "$constant" ]; then
+            echo "::error::Version header ($header) and NLG_VERSION ($constant) must match."
+            exit 1
+          fi
+          echo "version=$header" >> "$GITHUB_OUTPUT"
+
+      - name: Check whether this version is already released
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "v${{ steps.version.outputs.version }}" > /dev/null 2>&1; then
+            echo "Version ${{ steps.version.outputs.version }} is already released; nothing to do."
+            echo "released=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check PHP syntax
+        if: steps.existing.outputs.released != 'true'
+        run: find . -name '*.php' -not -path './.git/*' -print0 | xargs -0 -n1 php -l
+
+      - name: Build zip
+        if: steps.existing.outputs.released != 'true'
+        run: |
+          mkdir -p build/noble-lead-guard
+          rsync -a --exclude '.git' --exclude '.github' --exclude '.gitignore' --exclude 'build' ./ build/noble-lead-guard/
+          cd build && zip -qr noble-lead-guard.zip noble-lead-guard
+
+      - name: Publish release
+        if: steps.existing.outputs.released != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ steps.version.outputs.version }}" build/noble-lead-guard.zip \
+            --title "Lead Guard ${{ steps.version.outputs.version }}" \
+            --generate-notes
