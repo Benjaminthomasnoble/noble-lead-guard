@@ -19,6 +19,14 @@ class NLG_Updater {
 		add_filter( 'pre_set_site_transient_update_plugins', array( __CLASS__, 'inject_update' ) );
 		add_filter( 'plugins_api', array( __CLASS__, 'plugin_info' ), 10, 3 );
 		add_action( 'upgrader_process_complete', array( __CLASS__, 'clear_cache' ) );
+		// "Check again" under Dashboard > Updates asks GitHub fresh. WordPress refreshes plugin updates on this hook at priority 10.
+		add_action( 'load-update-core.php', array( __CLASS__, 'maybe_force_check' ), 9 );
+	}
+
+	public static function maybe_force_check() {
+		if ( ! empty( $_GET['force-check'] ) && current_user_can( 'update_plugins' ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- only clears a cache.
+			self::clear_cache();
+		}
 	}
 
 	public static function basename() {
