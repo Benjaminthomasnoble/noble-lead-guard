@@ -1,4 +1,4 @@
-# Lead Guard relay (Cloudflare Worker). Deployed by .github/workflows/relay.yml.
+# Lead Guard relay (Cloudflare Worker). Cloudflare Workers Builds deploys it from this folder on pushes to main.
 # The API key and other secrets are set in the Cloudflare dashboard, never in this file.
 name = "noble-lead-guard-relay"
 main = "src/index.js"

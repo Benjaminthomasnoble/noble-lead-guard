@@ -9,7 +9,7 @@ Checks every Gravity Forms submission with Claude and holds back spam and sales 
 3. **Paste the key** into the API key box under Settings > Lead Guard and save. After that the box shows dots and the last 4 characters, never the key itself.
 4. **On the same page,** leave Mode on **Test**. Under "About this business", click **Write it for me**: it reads the site's own pages (homepage, services, about, contact) and drafts the description in about 15 seconds. Read it, fix anything that's off, and click Save Changes. Each draft costs about 3 cents.
 5. **Try it.** Paste a spam message you got recently into "Try a message" and check the verdict. Then paste a real lead.
-6. **Wait two weeks.** Every new entry gets a Lead Guard note, the Recent checks table fills up, and a report email arrives weekly. Once nothing real has been flagged, switch Mode to **On**.
+6. **Wait two weeks.** Every new entry gets a Lead Guard note, the Recent checks table fills up, and, if you ticked the weekly report box, a report email arrives each week. Once nothing real has been flagged, switch Mode to **On**.
 
 ## How it decides
 
@@ -44,7 +44,7 @@ Open the entry from the report link, click **Not Spam**, then **Resend Notificat
 ## Notes
 
 - The API key is saved in its own database option, not loaded on every page view. To keep it out of the database instead, add `define( 'NOBLE_LEAD_GUARD_API_KEY', 'nlg1_...' );` (a connection code or an `sk-ant-` key) to wp-config.php, which overrides the settings box.
-- Weekly report address: set on the settings page, or `define( 'NOBLE_LEAD_GUARD_DIGEST_TO', '...' );`. Defaults to the site admin email.
+- Weekly report: off unless the box under Weekly report is ticked, and the box needs an email address (on the settings page, or `define( 'NOBLE_LEAD_GUARD_DIGEST_TO', '...' );`). Sites updating from 0.1.x keep the report only if they had typed in an address.
 - Default model: `claude-haiku-5-5` (about $0.0002 per check). Override with `define( 'NOBLE_LEAD_GUARD_MODEL', '...' );`.
 - Log rows older than 90 days are deleted. Uninstalling removes the log table and settings.
 - Gravity Forms 2.7+ is needed for the "why it was flagged" spam note. Older versions still block, without the note.
