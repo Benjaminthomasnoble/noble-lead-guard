@@ -33,15 +33,20 @@ class NLG_Updater {
 		return plugin_basename( NLG_FILE );
 	}
 
+	/**
+	 * A small JSON file attached to every release. Reading it through github.com's release
+	 * downloads avoids api.github.com, which allows only 60 requests an hour per server IP
+	 * and runs out on busy shared hosts.
+	 */
 	public static function info_url() {
-		return 'https://api.github.com/repos/' . self::REPO . '/releases/latest';
+		return 'https://github.com/' . self::REPO . '/releases/latest/download/update.json';
 	}
 
 	public static function repo_url() {
 		return 'https://github.com/' . self::REPO;
 	}
 
-	/** Latest release from GitHub, cached 12 hours (1 hour after a failed check). */
+	/** Latest release from GitHub, cached 12 hours (15 minutes after a failed check). */
 	public static function remote_info() {
 		$cached = get_site_transient( self::CACHE_KEY );
 		if ( is_array( $cached ) ) {
@@ -49,36 +54,61 @@ class NLG_Updater {
 		}
 
 		$info     = null;
+		$error    = '';
 		$response = wp_remote_get(
 			self::info_url(),
 			array(
-				'timeout' => 8,
-				'headers' => array(
-					'Accept'     => 'application/vnd.github+json',
-					'User-Agent' => 'NobleLeadGuard/' . NLG_VERSION,
-				),
+				'timeout'     => 8,
+				'redirection' => 5,
+				'headers'     => array( 'User-Agent' => 'NobleLeadGuard/' . NLG_VERSION ),
 			)
 		);
-		if ( ! is_wp_error( $response ) && 200 === (int) wp_remote_retrieve_response_code( $response ) ) {
+		if ( is_wp_error( $response ) ) {
+			$error = $response->get_error_message();
+		} elseif ( 200 !== (int) wp_remote_retrieve_response_code( $response ) ) {
+			$error = 'GitHub answered ' . (int) wp_remote_retrieve_response_code( $response );
+		} else {
 			$data    = json_decode( (string) wp_remote_retrieve_body( $response ), true );
-			$version = isset( $data['tag_name'] ) ? ltrim( (string) $data['tag_name'], 'vV' ) : '';
-			$package = '';
-			foreach ( (array) ( isset( $data['assets'] ) ? $data['assets'] : array() ) as $asset ) {
-				if ( isset( $asset['name'], $asset['browser_download_url'] ) && self::ASSET === $asset['name'] ) {
-					$package = (string) $asset['browser_download_url'];
-				}
-			}
+			$version = isset( $data['version'] ) ? (string) $data['version'] : '';
+			$package = isset( $data['package'] ) ? (string) $data['package'] : '';
 			if ( preg_match( '/^\d+(\.\d+)*$/', $version ) && 0 === strpos( $package, 'https://github.com/' . self::REPO . '/releases/download/' ) ) {
 				$info = array(
 					'version' => $version,
 					'package' => $package,
-					'notes'   => isset( $data['body'] ) ? mb_substr( (string) $data['body'], 0, 4000 ) : '',
+					'notes'   => isset( $data['notes'] ) ? mb_substr( (string) $data['notes'], 0, 4000 ) : '',
 				);
+			} else {
+				$error = 'The release info could not be read';
 			}
 		}
 
-		set_site_transient( self::CACHE_KEY, $info ? $info : array( 'version' => '' ), $info ? 12 * HOUR_IN_SECONDS : HOUR_IN_SECONDS );
+		update_option(
+			'nlg_update_status',
+			array(
+				'time'    => time(),
+				'version' => $info ? $info['version'] : '',
+				'error'   => $error,
+			),
+			false
+		);
+		set_site_transient( self::CACHE_KEY, $info ? $info : array( 'version' => '' ), $info ? 12 * HOUR_IN_SECONDS : 15 * MINUTE_IN_SECONDS );
 		return $info;
+	}
+
+	/** One line for the settings page: when updates were last checked and what was found. */
+	public static function status_text() {
+		$status = get_option( 'nlg_update_status' );
+		if ( ! is_array( $status ) || empty( $status['time'] ) ) {
+			return 'Not checked yet.';
+		}
+		$when = wp_date( 'M j, g:i a', (int) $status['time'] );
+		if ( '' !== $status['error'] ) {
+			return 'Last check failed (' . $status['error'] . ', ' . $when . '). It retries within 15 minutes.';
+		}
+		if ( version_compare( $status['version'], NLG_VERSION, '>' ) ) {
+			return 'Version ' . $status['version'] . ' is available (checked ' . $when . ').';
+		}
+		return 'Up to date (checked ' . $when . ').';
 	}
 
 	public static function inject_update( $transient ) {

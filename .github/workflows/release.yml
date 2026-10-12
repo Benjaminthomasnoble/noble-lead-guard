@@ -52,12 +52,16 @@ jobs:
           mkdir -p build/noble-lead-guard
           rsync -a --exclude '.git' --exclude '.github' --exclude '.gitignore' --exclude 'build' ./ build/noble-lead-guard/
           cd build && zip -qr noble-lead-guard.zip noble-lead-guard
+          version="${{ steps.version.outputs.version }}"
+          printf '{"version":"%s","package":"https://github.com/%s/releases/download/v%s/noble-lead-guard.zip"}\n' \
+            "$version" "${{ github.repository }}" "$version" > update.json
+          cat update.json
 
       - name: Publish release
         if: steps.existing.outputs.released != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v${{ steps.version.outputs.version }}" build/noble-lead-guard.zip \
+          gh release create "v${{ steps.version.outputs.version }}" build/noble-lead-guard.zip build/update.json \
             --title "Lead Guard ${{ steps.version.outputs.version }}" \
             --generate-notes

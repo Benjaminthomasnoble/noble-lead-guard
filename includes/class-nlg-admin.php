@@ -127,6 +127,7 @@ class NLG_Admin {
 					<tr><th>Gravity Forms</th><td><?php echo class_exists( 'GFForms' ) ? 'Active' : '<strong>Not active</strong>'; ?></td></tr>
 					<tr><th>Model</th><td><code><?php echo esc_html( NLG_Settings::model() ); ?></code></td></tr>
 					<tr><th>Weekly report goes to</th><td><?php echo esc_html( NLG_Settings::digest_to() ); ?></td></tr>
+					<tr><th>Updates</th><td><?php echo esc_html( NLG_Updater::status_text() ); ?> <a href="<?php echo esc_url( admin_url( 'update-core.php?force-check=1' ) ); ?>">Check now</a></td></tr>
 				</tbody>
 			</table>
 
