@@ -4,6 +4,9 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Settings live in one option. The API key is its own option (not autoloaded),
  * unless it is defined in wp-config.php.
+ *
+ * Instead of a key, a site can hold a connection code from the Lead Guard relay
+ * (relay/ in the repo). The relay keeps the one real key, so the site never has it.
  */
 class NLG_Settings {
 
@@ -72,7 +75,7 @@ class NLG_Settings {
 		return defined( 'NOBLE_LEAD_GUARD_API_KEY' ) && NOBLE_LEAD_GUARD_API_KEY;
 	}
 
-	/** A key in wp-config.php wins over one saved on the settings page. */
+	/** A key or connection code in wp-config.php wins over one saved on the settings page. */
 	public static function api_key() {
 		if ( self::key_in_config() ) {
 			return (string) NOBLE_LEAD_GUARD_API_KEY;
@@ -95,11 +98,43 @@ class NLG_Settings {
 		if ( '' === $input || self::KEY_MASK === $input ) {
 			return $current;
 		}
-		if ( ! preg_match( '/^sk-ant-[A-Za-z0-9_\-]{20,}$/', $input ) ) {
-			add_settings_error( self::KEY_OPTION, 'nlg_bad_key', 'That doesn\'t look like an Anthropic API key (they start with sk-ant-). The saved key was not changed.' );
+		if ( ! preg_match( '/^sk-ant-[A-Za-z0-9_\-]{20,}$/', $input ) && ! self::relay( $input ) ) {
+			add_settings_error( self::KEY_OPTION, 'nlg_bad_key', 'That doesn\'t look like an Anthropic API key (starts with sk-ant-) or a Lead Guard connection code (starts with nlg1_). Nothing was changed.' );
 			return $current;
 		}
 		return $input;
+	}
+
+	/**
+	 * Reads a connection code: nlg1_<relay address>.<site>.<signature>, each part base64url.
+	 * Only the relay can check the signature; here we just need where to send checks.
+	 *
+	 * @return array{url:string, site:string}|null
+	 */
+	public static function relay( $code = null ) {
+		$code = null === $code ? self::api_key() : (string) $code;
+		if ( ! preg_match( '/^nlg1_([A-Za-z0-9_\-]+)\.([A-Za-z0-9_\-]+)\.[A-Za-z0-9_\-]{20,}$/', $code, $m ) ) {
+			return null;
+		}
+		$url  = self::b64( $m[1] );
+		$site = self::b64( $m[2] );
+		if ( ! preg_match( '#^https://[a-z0-9.\-]+(:\d+)?$#i', $url ) || ! preg_match( '/^[a-z0-9.\-]+\.[a-z]{2,}$/', $site ) ) {
+			return null;
+		}
+		return array(
+			'url'  => $url,
+			'site' => $site,
+		);
+	}
+
+	private static function b64( $s ) {
+		return (string) base64_decode( strtr( $s, '-_', '+/' ), true );
+	}
+
+	/** This site's domain the way connection codes write it (no www). */
+	public static function home_site() {
+		$host = strtolower( (string) wp_parse_url( home_url( '/' ), PHP_URL_HOST ) );
+		return preg_replace( '/^www\./', '', $host );
 	}
 
 	public static function model() {

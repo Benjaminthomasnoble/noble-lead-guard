@@ -120,34 +120,24 @@ class NLG_Profile {
 		);
 		$key = NLG_Settings::api_key();
 		if ( ! $key ) {
-			$result['error'] = 'Add your API key first.';
+			$result['error'] = 'Add your API key or connection code first.';
 			return $result;
 		}
 
-		$response = wp_remote_post(
-			NLG_Classifier::ENDPOINT,
+		$response = NLG_Classifier::send(
 			array(
-				'timeout' => self::TIMEOUT,
-				'headers' => array(
-					'x-api-key'         => $key,
-					'anthropic-version' => '2023-06-01',
-					'content-type'      => 'application/json',
-				),
-				'body'    => wp_json_encode(
+				'model'         => self::MODEL,
+				'max_tokens'    => 4096,
+				'output_config' => array( 'effort' => 'low' ),
+				'system'        => self::system_prompt(),
+				'messages'      => array(
 					array(
-						'model'         => self::MODEL,
-						'max_tokens'    => 4096,
-						'output_config' => array( 'effort' => 'low' ),
-						'system'     => self::system_prompt(),
-						'messages'   => array(
-							array(
-								'role'    => 'user',
-								'content' => "<website>\n" . self::site_text() . "\n</website>",
-							),
-						),
-					)
+						'role'    => 'user',
+						'content' => "<website>\n" . self::site_text() . "\n</website>",
+					),
 				),
-			)
+			),
+			self::TIMEOUT
 		);
 
 		if ( is_wp_error( $response ) ) {

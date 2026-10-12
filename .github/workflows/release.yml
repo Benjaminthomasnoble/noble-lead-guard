@@ -50,7 +50,7 @@ jobs:
         if: steps.existing.outputs.released != 'true'
         run: |
           mkdir -p build/noble-lead-guard
-          rsync -a --exclude '.git' --exclude '.github' --exclude '.gitignore' --exclude 'build' ./ build/noble-lead-guard/
+          rsync -a --exclude '.git' --exclude '.github' --exclude '.gitignore' --exclude 'build' --exclude 'relay' ./ build/noble-lead-guard/
           cd build && zip -qr noble-lead-guard.zip noble-lead-guard
           version="${{ steps.version.outputs.version }}"
           printf '{"version":"%s","package":"https://github.com/%s/releases/download/v%s/noble-lead-guard.zip"}\n' \

@@ -1,0 +1,35 @@
+# Deploys the Lead Guard relay (relay/) to Cloudflare Workers when it changes on main.
+# Needs two repository secrets: CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID.
+# The Anthropic key and the relay's other secrets live in Cloudflare, never in this repo.
+name: Relay
+
+on:
+  push:
+    branches: [main]
+    paths: ['relay/**', '.github/workflows/relay.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: relay
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      HAS_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Skip until Cloudflare is connected
+        if: env.HAS_TOKEN != 'true'
+        run: echo "::notice::Add the CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID repository secrets to deploy the relay."
+
+      - name: Deploy
+        if: env.HAS_TOKEN == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: relay
+          wranglerVersion: '4.149.0'
