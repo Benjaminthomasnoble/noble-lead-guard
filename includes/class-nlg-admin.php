@@ -112,7 +112,7 @@ class NLG_Admin {
 		$opt = NLG_Settings::OPTION;
 		?>
 		<div class="wrap">
-			<h1>Lead Guard</h1>
+			<h1>Lead Guard <span style="font-size:13px;font-weight:400;color:#646970">version <?php echo esc_html( NLG_VERSION ); ?></span></h1>
 			<p>Checks every Gravity Forms submission with AI and holds back spam and sales pitches before the notification email goes out. Held-back entries stay in the form's Spam folder. If the check fails or times out, the email goes out as normal.</p>
 
 			<?php if ( isset( $_GET['nlg_digest'] ) ) : // phpcs:ignore WordPress.Security.NonceVerification.Recommended ?>
