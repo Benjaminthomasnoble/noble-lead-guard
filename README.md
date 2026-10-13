@@ -1,4 +1,4 @@
-# Noble Lead Guard 0.2.1
+# Noble Lead Guard 0.2.2
 
 Checks every Gravity Forms submission with Claude and holds back spam and sales pitches before the notification email goes out. Held-back entries stay in the form's Spam folder with a note saying why. Anything the AI isn't sure about, and anything it can't check (timeout, API outage), is emailed as normal.
 
@@ -26,7 +26,7 @@ Forms with payment fields are never checked. Submissions another filter already 
 
 ## Connection codes (no key on client sites)
 
-Client sites don't need the API key. The Lead Guard relay (see [relay/README.md](relay/README.md)) holds the one key on Cloudflare, and each site gets its own connection code from the relay's `/admin` page. Paste the code where the key would go. A site with its own `sk-ant-` key still talks to Anthropic directly.
+Client sites don't need the API key. The Lead Guard relay (see [relay/README.md](relay/README.md)) holds the one key on Cloudflare, and each site gets its own connection code from the relay. On the site's Settings > Lead Guard page, type the relay admin password and click **Connect this site** to fetch and save the code, or make one on the relay's `/admin` page and paste it where the key would go. A site with its own `sk-ant-` key still talks to Anthropic directly.
 
 ## Updates
 

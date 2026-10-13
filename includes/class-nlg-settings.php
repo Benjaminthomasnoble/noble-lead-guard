@@ -14,6 +14,7 @@ class NLG_Settings {
 	const KEY_OPTION    = 'nlg_api_key';
 	const KEY_MASK      = 'nlg-saved-key-unchanged-0000';
 	const DEFAULT_MODEL = 'claude-haiku-5-5';
+	const RELAY_URL     = 'https://noble-lead-guard-relay.bnoble-c62.workers.dev';
 
 	public static function defaults() {
 		return array(
@@ -143,6 +144,12 @@ class NLG_Settings {
 	public static function home_site() {
 		$host = strtolower( (string) wp_parse_url( home_url( '/' ), PHP_URL_HOST ) );
 		return preg_replace( '/^www\./', '', $host );
+	}
+
+	/** Where "Connect this site" asks for a connection code. Override with NOBLE_LEAD_GUARD_RELAY in wp-config.php. */
+	public static function relay_url() {
+		$url = ( defined( 'NOBLE_LEAD_GUARD_RELAY' ) && NOBLE_LEAD_GUARD_RELAY ) ? (string) NOBLE_LEAD_GUARD_RELAY : self::RELAY_URL;
+		return untrailingslashit( $url );
 	}
 
 	public static function model() {

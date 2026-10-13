@@ -15,6 +15,7 @@ class NLG_Admin {
 		add_action( 'admin_post_nlg_try', array( __CLASS__, 'handle_try' ) );
 		add_action( 'admin_post_nlg_digest', array( __CLASS__, 'handle_digest' ) );
 		add_action( 'admin_post_nlg_profile', array( __CLASS__, 'handle_profile' ) );
+		add_action( 'admin_post_nlg_connect', array( __CLASS__, 'handle_connect' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( NLG_FILE ), array( __CLASS__, 'action_links' ) );
 	}
 
@@ -103,6 +104,80 @@ class NLG_Admin {
 		exit;
 	}
 
+	/** "Connect this site": asks the relay for this site's connection code and saves it. The password is never saved. */
+	public static function handle_connect() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( 'Not allowed.' );
+		}
+		check_admin_referer( 'nlg_connect' );
+
+		$password = isset( $_POST['nlg_relay_password'] ) ? (string) wp_unslash( $_POST['nlg_relay_password'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- a password, sent as typed and never stored or shown.
+		set_transient( 'nlg_connect_' . get_current_user_id(), self::connect( $password ), 5 * MINUTE_IN_SECONDS );
+		wp_safe_redirect( self::page_url() );
+		exit;
+	}
+
+	/** @return array{ok:bool, message:string} */
+	private static function connect( $password ) {
+		if ( NLG_Settings::key_in_config() ) {
+			return array(
+				'ok'      => false,
+				'message' => 'A key is set in wp-config.php, which overrides the saved one. Change it there instead.',
+			);
+		}
+		if ( '' === $password ) {
+			return array(
+				'ok'      => false,
+				'message' => 'Type the relay admin password first.',
+			);
+		}
+
+		$site     = NLG_Settings::home_site();
+		$response = wp_remote_post(
+			NLG_Settings::relay_url() . '/admin',
+			array(
+				'timeout' => 10,
+				'headers' => array( 'Accept' => 'application/json' ),
+				'body'    => array(
+					'site'     => $site,
+					'password' => $password,
+				),
+			)
+		);
+		if ( is_wp_error( $response ) ) {
+			return array(
+				'ok'      => false,
+				'message' => 'Couldn\'t reach the Lead Guard relay: ' . $response->get_error_message(),
+			);
+		}
+
+		$status = (int) wp_remote_retrieve_response_code( $response );
+		$data   = json_decode( wp_remote_retrieve_body( $response ), true );
+		$code   = is_array( $data ) && isset( $data['code'] ) ? (string) $data['code'] : '';
+		if ( 200 !== $status || '' === $code ) {
+			return array(
+				'ok'      => false,
+				'message' => is_array( $data ) && isset( $data['error']['message'] )
+					? 'The Lead Guard relay said: ' . $data['error']['message']
+					: 'The Lead Guard relay answered with an error (HTTP ' . $status . ').',
+			);
+		}
+
+		$relay = NLG_Settings::relay( $code );
+		if ( ! $relay || $relay['site'] !== $site ) {
+			return array(
+				'ok'      => false,
+				'message' => 'The relay sent back a code that isn\'t for ' . $site . '. Nothing was changed.',
+			);
+		}
+
+		update_option( NLG_Settings::KEY_OPTION, $code, false );
+		return array(
+			'ok'      => true,
+			'message' => 'Connected through the Lead Guard relay.',
+		);
+	}
+
 	private static function page_url() {
 		return admin_url( 'options-general.php?page=' . self::SLUG );
 	}
@@ -133,6 +208,15 @@ class NLG_Admin {
 				</p></div>
 			<?php endif; ?>
 
+			<?php
+			$connect_key = 'nlg_connect_' . get_current_user_id();
+			$connect     = get_transient( $connect_key );
+			if ( is_array( $connect ) ) {
+				delete_transient( $connect_key );
+				printf( '<div class="notice notice-%s"><p>%s</p></div>', $connect['ok'] ? 'success' : 'error', esc_html( $connect['message'] ) );
+			}
+			?>
+
 			<table class="widefat striped" style="max-width:720px;margin:1em 0">
 				<tbody>
 					<tr><th>API key</th><td><?php echo wp_kses( self::key_status( $key ), array( 'strong' => array() ) ); ?></td></tr>
@@ -157,6 +241,12 @@ class NLG_Admin {
 									<label style="margin-left:8px"><input type="checkbox" name="nlg_api_key_remove" value="1"> Remove it</label>
 								<?php endif; ?>
 								<p class="description"><?php echo $key ? 'Saved. To replace it, click the box and paste a new one.' : 'Paste the connection code from Noble Digital, or your own Anthropic API key. It is never shown again after you save it.'; ?></p>
+								<p style="margin-top:12px">
+									<label for="nlg-relay-password">Relay admin password</label><br>
+									<input id="nlg-relay-password" type="password" name="nlg_relay_password" form="nlg-connect" class="regular-text" autocomplete="off">
+									<button type="submit" class="button" form="nlg-connect">Connect this site</button>
+								</p>
+								<p class="description">Or get the code for you: type the relay's admin password and click Connect this site. It fetches a code for <?php echo esc_html( NLG_Settings::home_site() ); ?> and saves it (the password isn't saved). Unsaved changes elsewhere on this page are lost, so save first.</p>
 							<?php endif; ?>
 						</td>
 					</tr>
@@ -240,6 +330,13 @@ class NLG_Admin {
 				</table>
 				<?php submit_button(); ?>
 			</form>
+
+			<?php if ( ! NLG_Settings::key_in_config() ) : ?>
+				<form id="nlg-connect" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+					<input type="hidden" name="action" value="nlg_connect">
+					<?php wp_nonce_field( 'nlg_connect' ); ?>
+				</form>
+			<?php endif; ?>
 
 			<h2 id="try">Try a message</h2>
 			<?php self::render_try_result(); ?>

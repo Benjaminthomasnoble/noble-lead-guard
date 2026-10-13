@@ -22,6 +22,10 @@ adds the key and passes it on to Anthropic. Nothing is stored on the relay.
 
 ## Connecting a site
 
+On the site (0.2.2 or later): **Settings > Lead Guard**, type the admin password under **Relay admin password** and click **Connect this site**. The plugin asks the relay for that site's code and saves it. It uses `https://noble-lead-guard-relay.bnoble-c62.workers.dev` unless wp-config.php sets another relay with `define( 'NOBLE_LEAD_GUARD_RELAY', 'https://...' );`.
+
+Or by hand:
+
 1. Open `https://noble-lead-guard-relay.<your-subdomain>.workers.dev/admin`.
 2. Enter the site's domain (like `terrafirmaconcrete.com`) and the admin password, then **Make connection code**.
 3. On that site: **Settings > Lead Guard**, paste the code in the **API key or connection code** box, and save. Or put it in wp-config.php: `define( 'NOBLE_LEAD_GUARD_API_KEY', 'nlg1_...' );`
