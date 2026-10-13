@@ -14,6 +14,7 @@ class NLG_Settings {
 	const KEY_OPTION    = 'nlg_api_key';
 	const KEY_MASK      = 'nlg-saved-key-unchanged-0000';
 	const DEFAULT_MODEL = 'claude-haiku-5-5';
+	const STRONG_MODEL  = 'claude-opus-5-5';
 
 	public static function defaults() {
 		return array(
@@ -22,6 +23,8 @@ class NLG_Settings {
 			'hold_solicitations' => 1,
 			'min_confidence'     => 'high', // high | medium
 			'timeout'            => 5,
+			'model'              => 'haiku', // haiku | opus
+			'double_check'       => 1, // when Haiku isn't sure, Opus checks again
 			'digest_on'          => 0, // weekly report is opt-in and needs an email address
 			'digest_to'          => '',
 			'skip_forms'         => '',
@@ -67,6 +70,9 @@ class NLG_Settings {
 
 		$timeout        = isset( $input['timeout'] ) ? (int) $input['timeout'] : 5;
 		$out['timeout'] = max( 2, min( 15, $timeout ) );
+
+		$out['model']        = isset( $input['model'] ) && 'opus' === $input['model'] ? 'opus' : 'haiku';
+		$out['double_check'] = empty( $input['double_check'] ) ? 0 : 1;
 
 		$out['digest_to'] = isset( $input['digest_to'] ) ? sanitize_email( $input['digest_to'] ) : '';
 		// The box only counts when there is an address to send to.
@@ -145,8 +151,21 @@ class NLG_Settings {
 		return preg_replace( '/^www\./', '', $host );
 	}
 
+	public static function model_in_config() {
+		return defined( 'NOBLE_LEAD_GUARD_MODEL' ) && NOBLE_LEAD_GUARD_MODEL;
+	}
+
+	/** The model that checks every submission: wp-config.php wins, then the setting. */
 	public static function model() {
-		return ( defined( 'NOBLE_LEAD_GUARD_MODEL' ) && NOBLE_LEAD_GUARD_MODEL ) ? (string) NOBLE_LEAD_GUARD_MODEL : self::DEFAULT_MODEL;
+		if ( self::model_in_config() ) {
+			return (string) NOBLE_LEAD_GUARD_MODEL;
+		}
+		return 'opus' === self::get( 'model' ) ? self::STRONG_MODEL : self::DEFAULT_MODEL;
+	}
+
+	/** Whether results the first model isn't sure about get a second look from the strong model. */
+	public static function double_check() {
+		return self::STRONG_MODEL !== self::model() && (bool) self::get( 'double_check' );
 	}
 
 	/** Where the weekly report goes: the address on the settings page, else one in wp-config.php, else nowhere. */

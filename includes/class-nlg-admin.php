@@ -137,7 +137,7 @@ class NLG_Admin {
 				<tbody>
 					<tr><th>API key</th><td><?php echo wp_kses( self::key_status( $key ), array( 'strong' => array() ) ); ?></td></tr>
 					<tr><th>Gravity Forms</th><td><?php echo class_exists( 'GFForms' ) ? 'Active' : '<strong>Not active</strong>'; ?></td></tr>
-					<tr><th>Model</th><td><code><?php echo esc_html( NLG_Settings::model() ); ?></code></td></tr>
+					<tr><th>Model</th><td><code><?php echo esc_html( NLG_Settings::model() ); ?></code><?php echo NLG_Settings::double_check() ? ', with <code>' . esc_html( NLG_Settings::STRONG_MODEL ) . '</code> double-checking unsure ones' : ''; ?></td></tr>
 					<tr><th>Weekly report</th><td><?php echo NLG_Settings::digest_enabled() ? 'On, sent to ' . esc_html( NLG_Settings::digest_to() ) : 'Off'; ?></td></tr>
 					<tr><th>Updates</th><td><?php echo esc_html( NLG_Updater::status_text() ); ?> <a href="<?php echo esc_url( admin_url( 'update-core.php?force-check=1' ) ); ?>">Check now</a></td></tr>
 				</tbody>
@@ -221,8 +221,22 @@ class NLG_Admin {
 						</td>
 					</tr>
 					<tr>
+						<th scope="row">AI model</th>
+						<td>
+							<?php if ( NLG_Settings::model_in_config() ) : ?>
+								<p><code><?php echo esc_html( NLG_Settings::model() ); ?></code>, set in wp-config.php.</p>
+								<input type="hidden" name="<?php echo esc_attr( $opt ); ?>[model]" value="<?php echo esc_attr( $s['model'] ); ?>">
+							<?php else : ?>
+								<label style="display:block"><input type="radio" name="<?php echo esc_attr( $opt ); ?>[model]" value="haiku" <?php checked( $s['model'], 'haiku' ); ?>> Haiku: fast and cheapest (about 3 cents per 100 checks)</label>
+								<label style="display:block"><input type="radio" name="<?php echo esc_attr( $opt ); ?>[model]" value="opus" <?php checked( $s['model'], 'opus' ); ?>> Opus: strongest, a few seconds slower (about $1 per 100 checks)</label>
+							<?php endif; ?>
+							<label style="display:block;margin-top:6px"><input type="checkbox" name="<?php echo esc_attr( $opt ); ?>[double_check]" value="1" <?php checked( $s['double_check'], 1 ); ?>> When Haiku isn't sure, have Opus check it again</label>
+							<p class="description">Only the unsure ones get the second look, so it adds about a cent and a few seconds to those and nothing to the rest.</p>
+						</td>
+					</tr>
+					<tr>
 						<th scope="row"><label for="nlg-timeout">Time limit</label></th>
-						<td><input id="nlg-timeout" type="number" min="2" max="15" name="<?php echo esc_attr( $opt ); ?>[timeout]" value="<?php echo esc_attr( $s['timeout'] ); ?>" class="small-text"> seconds. After this the submission goes through unchecked.</td>
+						<td><input id="nlg-timeout" type="number" min="2" max="15" name="<?php echo esc_attr( $opt ); ?>[timeout]" value="<?php echo esc_attr( $s['timeout'] ); ?>" class="small-text"> seconds. After this the submission goes through unchecked. An Opus double-check gets up to 10.</td>
 					</tr>
 					<tr>
 						<th scope="row"><label for="nlg-digest">Weekly report</label></th>
@@ -291,7 +305,7 @@ class NLG_Admin {
 			<li>Gravity Forms' own spam checks run first. Anything they catch never reaches the AI.</li>
 			<li>Forms that take payments, forms on the skip list, and empty submissions are never checked.</li>
 			<li>If the sender uses a business email address (not Gmail, Yahoo, Outlook and the like), Lead Guard looks up that company's website title and description, so it can tell when the sender sells marketing, software, staffing or similar services.</li>
-			<li>The AI reads the submission, the "About this business" line and that website info, then rates it as a <strong>lead</strong>, <strong>unclear</strong>, a <strong>sales pitch</strong> or <strong>spam</strong>, and says how sure it is.</li>
+			<li>The AI reads the submission, the "About this business" line and that website info, then rates it as a <strong>lead</strong>, <strong>unclear</strong>, a <strong>sales pitch</strong> or <strong>spam</strong>, and says how sure it is.<?php echo NLG_Settings::double_check() ? ' If Haiku isn\'t sure, Opus, a stronger model, reads it again and its answer is the one used.' : ''; ?></li>
 			<li>With the current settings, it holds back <?php echo esc_html( $holds ); ?> only when the AI is <?php echo esc_html( $sure ); ?>. Everything else is emailed as normal, including anything it couldn't check because of a timeout or outage.</li>
 		</ol>
 		<p style="max-width:760px">Held-back entries are never deleted. They sit in the form's Spam folder with a note saying why. To rescue one, open it, click <strong>Not Spam</strong>, then <strong>Resend Notifications</strong>. In Test mode nothing is held back; each entry just gets a note with what the AI would have done.</p>

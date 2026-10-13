@@ -13,8 +13,11 @@ class NLG_Classifier {
 	const VERDICTS = array( 'lead', 'solicitation', 'spam', 'unclear' );
 	const LEVELS   = array( 'high', 'medium', 'low' );
 
+	// A second look by the strong model gets at least this long, since it is slower than Haiku.
+	const DOUBLE_CHECK_TIMEOUT = 10;
+
 	/**
-	 * @return array{ok:bool, verdict:string, confidence:string, reason:string, error:string, latency_ms:int, site:string}
+	 * @return array{ok:bool, verdict:string, confidence:string, reason:string, error:string, latency_ms:int, site:string, model:string}
 	 */
 	public static function classify( $submission, $profile, $timeout ) {
 		$result = array(
@@ -25,10 +28,10 @@ class NLG_Classifier {
 			'error'      => '',
 			'latency_ms' => 0,
 			'site'       => '',
+			'model'      => '',
 		);
 
-		$key = NLG_Settings::api_key();
-		if ( ! $key ) {
+		if ( ! NLG_Settings::api_key() ) {
 			$result['error'] = 'No API key or connection code';
 			return $result;
 		}
@@ -41,9 +44,41 @@ class NLG_Classifier {
 		if ( '' !== $result['site'] ) {
 			$content .= "\n\n<sender_email_website>\n" . $result['site'] . "\n</sender_email_website>";
 		}
+		$system = self::system_prompt( $profile );
+
+		$result['model'] = NLG_Settings::model();
+		$result          = array_merge( $result, self::ask( $result['model'], $system, $content, $timeout ) );
+
+		// Anything Haiku isn't sure about gets a second look. If that fails, Haiku's answer stands.
+		if ( $result['ok'] && NLG_Settings::double_check() && ( 'unclear' === $result['verdict'] || 'high' !== $result['confidence'] ) ) {
+			$second = self::ask( NLG_Settings::STRONG_MODEL, $system, $content, max( (int) $timeout, self::DOUBLE_CHECK_TIMEOUT ) );
+			if ( $second['ok'] ) {
+				$result           = array_merge( $result, $second );
+				$result['model']  = NLG_Settings::STRONG_MODEL;
+				$result['reason'] = 'Double-checked by Opus: ' . $result['reason'];
+			}
+		}
+
+		$result['latency_ms'] = (int) round( ( microtime( true ) - $start ) * 1000 );
+		return $result;
+	}
+
+	/**
+	 * One request to one model.
+	 *
+	 * @return array{ok:bool, verdict:string, confidence:string, reason:string, error:string}
+	 */
+	private static function ask( $model, $system, $content, $timeout ) {
+		$result = array(
+			'ok'         => false,
+			'verdict'    => '',
+			'confidence' => '',
+			'reason'     => '',
+			'error'      => '',
+		);
 
 		$body = array(
-			'model'         => NLG_Settings::model(),
+			'model'         => $model,
 			'max_tokens'    => 1024,
 			'output_config' => array(
 				'effort' => 'low',
@@ -52,7 +87,7 @@ class NLG_Classifier {
 					'schema' => self::schema(),
 				),
 			),
-			'system'        => self::system_prompt( $profile ),
+			'system'        => $system,
 			'messages'      => array(
 				array(
 					'role'    => 'user',
@@ -62,7 +97,6 @@ class NLG_Classifier {
 		);
 
 		$response = self::send( $body, $timeout );
-		$result['latency_ms'] = (int) round( ( microtime( true ) - $start ) * 1000 );
 
 		if ( is_wp_error( $response ) ) {
 			$result['error'] = 'Request failed: ' . $response->get_error_message();
