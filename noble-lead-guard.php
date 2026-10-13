@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Noble Lead Guard
  * Description:       Uses AI to hold back spam and sales pitches sent through Gravity Forms before the notification email goes out.
- * Version:           0.2.1
+ * Version:           0.2.2
  * Author:            Noble Digital
  * Author URI:        https://nobledigital.tech
  * Requires at least: 6.0
@@ -16,11 +16,12 @@
  *     define( 'NOBLE_LEAD_GUARD_API_KEY', 'nlg1_...' ); // connection code, or an sk-ant-... key
  *     define( 'NOBLE_LEAD_GUARD_DIGEST_TO', 'you@example.com' );
  *     define( 'NOBLE_LEAD_GUARD_MODEL', 'claude-haiku-5-5' );
+ *     define( 'NOBLE_LEAD_GUARD_RELAY', 'https://...' ); // relay used by "Connect this site"
  */
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'NLG_VERSION', '0.2.1' );
+define( 'NLG_VERSION', '0.2.2' );
 define( 'NLG_FILE', __FILE__ );
 define( 'NLG_DIR', __DIR__ . '/' );
 

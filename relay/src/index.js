@@ -145,8 +145,14 @@ function blockedSites(env) {
     .filter(Boolean);
 }
 
+/**
+ * The page where connection codes are made. A POST with "Accept: application/json" (the plugin's
+ * "Connect this site" button) gets {site, code} or {error: {message}} back instead of the page.
+ */
 async function admin(request, env, url) {
+  const wantsJson = request.method === 'POST' && (request.headers.get('accept') || '').includes('application/json');
   if (!env.ADMIN_PASSWORD || !env.SITE_SECRET) {
+    if (wantsJson) return json({ error: { message: 'The relay is not set up yet (missing secrets)' } }, 503);
     return html(page('<p>Add the ADMIN_PASSWORD and SITE_SECRET secrets in Cloudflare first.</p>' + secretHint()));
   }
   if (request.method !== 'POST') {
@@ -156,19 +162,25 @@ async function admin(request, env, url) {
   if (env.ADMIN_LIMITER) {
     const ip = request.headers.get('cf-connecting-ip') || 'unknown';
     const { success } = await env.ADMIN_LIMITER.limit({ key: ip });
-    if (!success) return html(page('<p>Too many tries. Wait a minute.</p>'), 429);
+    if (!success) {
+      if (wantsJson) return json({ error: { message: 'Too many tries. Wait a minute.' } }, 429);
+      return html(page('<p>Too many tries. Wait a minute.</p>'), 429);
+    }
   }
 
   const data = await request.formData();
   const password = String(data.get('password') || '');
   const site = cleanSite(data.get('site'));
   if (!(await sameText(password, env.ADMIN_PASSWORD, env.SITE_SECRET))) {
+    if (wantsJson) return json({ error: { message: 'Wrong password.' } }, 401);
     return html(page('<p class="err">Wrong password.</p>' + form(data.get('site') || '')), 401);
   }
   if (!site) {
+    if (wantsJson) return json({ error: { message: 'The relay could not read the site\'s domain, like terrafirmaconcrete.com.' } }, 400);
     return html(page('<p class="err">Enter the site\'s domain, like terrafirmaconcrete.com.</p>' + form('')));
   }
   const code = await makeCode(url.origin, site, env.SITE_SECRET);
+  if (wantsJson) return json({ site, code });
   return html(
     page(
       `<p>Connection code for <strong>${escape(site)}</strong>:</p>
