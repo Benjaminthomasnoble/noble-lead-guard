@@ -24,10 +24,14 @@ class NLG_Digest {
 	}
 
 	/**
+	 * @param bool $now True for the "Send the weekly report now" button, which works even with the weekly box unticked.
 	 * @return bool Whether an email went out. Nothing is sent for a week with no checks.
 	 */
-	public static function send() {
+	public static function send( $now = false ) {
 		NLG_Log::prune( 90 );
+		if ( '' === NLG_Settings::digest_to() || ( ! $now && ! NLG_Settings::digest_enabled() ) ) {
+			return false;
+		}
 		$rows = NLG_Log::since( gmdate( 'Y-m-d H:i:s', time() - WEEK_IN_SECONDS ) );
 		if ( ! $rows ) {
 			return false;

@@ -80,8 +80,12 @@ class NLG_Admin {
 			wp_die( 'Not allowed.' );
 		}
 		check_admin_referer( 'nlg_digest' );
-		$sent = NLG_Digest::send();
-		wp_safe_redirect( add_query_arg( 'nlg_digest', $sent ? 'sent' : 'empty', self::page_url() ) );
+		if ( '' === NLG_Settings::digest_to() ) {
+			$result = 'noemail';
+		} else {
+			$result = NLG_Digest::send( true ) ? 'sent' : 'empty';
+		}
+		wp_safe_redirect( add_query_arg( 'nlg_digest', $result, self::page_url() ) );
 		exit;
 	}
 
@@ -117,7 +121,15 @@ class NLG_Admin {
 
 			<?php if ( isset( $_GET['nlg_digest'] ) ) : // phpcs:ignore WordPress.Security.NonceVerification.Recommended ?>
 				<div class="notice notice-info"><p>
-					<?php echo 'sent' === $_GET['nlg_digest'] ? 'Report sent to ' . esc_html( NLG_Settings::digest_to() ) . '.' : 'Nothing was checked in the last 7 days, so no report was sent.'; // phpcs:ignore ?>
+					<?php
+					$messages = array(
+						'sent'    => 'Report sent to ' . NLG_Settings::digest_to() . '.',
+						'empty'   => 'Nothing was checked in the last 7 days, so no report was sent.',
+						'noemail' => 'Add an email address for the weekly report first.',
+					);
+					$which    = sanitize_key( wp_unslash( $_GET['nlg_digest'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+					echo esc_html( isset( $messages[ $which ] ) ? $messages[ $which ] : '' );
+					?>
 				</p></div>
 			<?php endif; ?>
 
@@ -126,7 +138,7 @@ class NLG_Admin {
 					<tr><th>API key</th><td><?php echo wp_kses( self::key_status( $key ), array( 'strong' => array() ) ); ?></td></tr>
 					<tr><th>Gravity Forms</th><td><?php echo class_exists( 'GFForms' ) ? 'Active' : '<strong>Not active</strong>'; ?></td></tr>
 					<tr><th>Model</th><td><code><?php echo esc_html( NLG_Settings::model() ); ?></code></td></tr>
-					<tr><th>Weekly report goes to</th><td><?php echo esc_html( NLG_Settings::digest_to() ); ?></td></tr>
+					<tr><th>Weekly report</th><td><?php echo NLG_Settings::digest_enabled() ? 'On, sent to ' . esc_html( NLG_Settings::digest_to() ) : 'Off'; ?></td></tr>
 					<tr><th>Updates</th><td><?php echo esc_html( NLG_Updater::status_text() ); ?> <a href="<?php echo esc_url( admin_url( 'update-core.php?force-check=1' ) ); ?>">Check now</a></td></tr>
 				</tbody>
 			</table>
@@ -213,8 +225,13 @@ class NLG_Admin {
 						<td><input id="nlg-timeout" type="number" min="2" max="15" name="<?php echo esc_attr( $opt ); ?>[timeout]" value="<?php echo esc_attr( $s['timeout'] ); ?>" class="small-text"> seconds. After this the submission goes through unchecked.</td>
 					</tr>
 					<tr>
-						<th scope="row"><label for="nlg-digest">Weekly report email</label></th>
-						<td><input id="nlg-digest" type="email" name="<?php echo esc_attr( $opt ); ?>[digest_to]" value="<?php echo esc_attr( $s['digest_to'] ); ?>" class="regular-text" placeholder="<?php echo esc_attr( NLG_Settings::digest_to() ); ?>"></td>
+						<th scope="row"><label for="nlg-digest">Weekly report</label></th>
+						<td>
+							<?php $config_to = '' === $s['digest_to'] ? NLG_Settings::digest_to() : ''; ?>
+							<input id="nlg-digest" type="email" name="<?php echo esc_attr( $opt ); ?>[digest_to]" value="<?php echo esc_attr( $s['digest_to'] ); ?>" class="regular-text" placeholder="<?php echo esc_attr( $config_to ? $config_to : 'you@example.com' ); ?>" data-fallback="<?php echo esc_attr( $config_to ); ?>" oninput="var b=document.getElementById('nlg-digest-on');b.disabled=!(this.value.trim()&amp;&amp;this.checkValidity())&amp;&amp;!this.dataset.fallback;if(b.disabled){b.checked=false;}">
+							<label style="display:block;margin-top:6px"><input id="nlg-digest-on" type="checkbox" name="<?php echo esc_attr( $opt ); ?>[digest_on]" value="1" <?php checked( NLG_Settings::digest_enabled() ); ?> <?php disabled( '' === NLG_Settings::digest_to() ); ?>> Email me a weekly report of what was held back</label>
+							<p class="description">Off unless you tick the box, and the box only works once there's an email address.</p>
+						</td>
 					</tr>
 					<tr>
 						<th scope="row"><label for="nlg-skip">Skip these form IDs</label></th>
@@ -239,7 +256,7 @@ class NLG_Admin {
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 				<input type="hidden" name="action" value="nlg_digest">
 				<?php wp_nonce_field( 'nlg_digest' ); ?>
-				<?php submit_button( 'Send the weekly report now', 'secondary' ); ?>
+				<?php submit_button( 'Send the weekly report now', 'secondary', 'submit', true, '' === NLG_Settings::digest_to() ? array( 'disabled' => 'disabled' ) : null ); ?>
 			</form>
 
 			<?php self::render_how_it_decides(); ?>

@@ -22,6 +22,7 @@ class NLG_Settings {
 			'hold_solicitations' => 1,
 			'min_confidence'     => 'high', // high | medium
 			'timeout'            => 5,
+			'digest_on'          => 0, // weekly report is opt-in and needs an email address
 			'digest_to'          => '',
 			'skip_forms'         => '',
 		);
@@ -37,6 +38,11 @@ class NLG_Settings {
 			$saved['min_confidence']     = 'strict' === $saved['strictness'] ? 'medium' : 'high';
 		}
 		unset( $saved['strictness'] );
+
+		// Before 0.2.0 the report always went out. Keep it for sites that typed in an address; others stop getting it.
+		if ( ! isset( $saved['digest_on'] ) && $saved ) {
+			$saved['digest_on'] = empty( $saved['digest_to'] ) ? 0 : 1;
+		}
 
 		return array_merge( self::defaults(), $saved );
 	}
@@ -63,6 +69,8 @@ class NLG_Settings {
 		$out['timeout'] = max( 2, min( 15, $timeout ) );
 
 		$out['digest_to'] = isset( $input['digest_to'] ) ? sanitize_email( $input['digest_to'] ) : '';
+		// The box only counts when there is an address to send to.
+		$out['digest_on'] = ! empty( $input['digest_on'] ) && ( '' !== $out['digest_to'] || self::digest_to_in_config() ) ? 1 : 0;
 
 		$ids               = isset( $input['skip_forms'] ) ? preg_split( '/[^0-9]+/', (string) $input['skip_forms'] ) : array();
 		$ids               = array_filter( array_map( 'intval', $ids ) );
@@ -141,12 +149,22 @@ class NLG_Settings {
 		return ( defined( 'NOBLE_LEAD_GUARD_MODEL' ) && NOBLE_LEAD_GUARD_MODEL ) ? (string) NOBLE_LEAD_GUARD_MODEL : self::DEFAULT_MODEL;
 	}
 
+	/** Where the weekly report goes: the address on the settings page, else one in wp-config.php, else nowhere. */
 	public static function digest_to() {
 		$to = self::get( 'digest_to' );
-		if ( ! $to && defined( 'NOBLE_LEAD_GUARD_DIGEST_TO' ) ) {
+		if ( ! $to && self::digest_to_in_config() ) {
 			$to = NOBLE_LEAD_GUARD_DIGEST_TO;
 		}
-		return $to ? $to : get_option( 'admin_email' );
+		return (string) $to;
+	}
+
+	private static function digest_to_in_config() {
+		return defined( 'NOBLE_LEAD_GUARD_DIGEST_TO' ) && NOBLE_LEAD_GUARD_DIGEST_TO;
+	}
+
+	/** The weekly report goes out only when the box is ticked and there is an address. */
+	public static function digest_enabled() {
+		return (bool) self::get( 'digest_on' ) && '' !== self::digest_to();
 	}
 
 	public static function is_form_skipped( $form_id ) {

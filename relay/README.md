@@ -14,11 +14,8 @@ adds the key and passes it on to Anthropic. Nothing is stored on the relay.
 ## One-time setup
 
 1. **Cloudflare account.** Sign up free at dash.cloudflare.com. Open **Workers & Pages** once and accept the free `workers.dev` subdomain it offers.
-2. **API token for GitHub.** In Cloudflare: profile icon > **My Profile** > **API Tokens** > **Create Token** > use the **Edit Cloudflare Workers** template > Continue > Create. Copy the token.
-3. **Account ID.** In Cloudflare: **Workers & Pages** overview; the Account ID is in the right-hand column. Copy it.
-4. **Give both to GitHub.** In this repo on GitHub: **Settings** > **Secrets and variables** > **Actions** > **New repository secret**. Add `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
-5. **Deploy.** On GitHub: **Actions** > **Relay** > **Run workflow**. After that it redeploys on its own whenever `relay/` changes on main.
-6. **Add the secrets in Cloudflare.** **Workers & Pages** > `noble-lead-guard-relay` > **Settings** > **Variables and Secrets** > **Add**, type **Secret**, for each of:
+2. **Connect the repo.** **Workers & Pages** > **Create application** > **Import a repository** > GitHub > `noble-lead-guard`. Set the project name to `noble-lead-guard-relay`, the root directory to `relay`, leave the build command empty and the deploy command as `npx wrangler deploy`. Cloudflare then redeploys the relay on its own whenever `relay/` changes on main. No API token is needed.
+3. **Add the secrets.** **Workers & Pages** > `noble-lead-guard-relay` > **Settings** > **Variables and Secrets** > **Add**, type **Secret**, for each of:
    - `ANTHROPIC_API_KEY`: the key (create a fresh one in the Anthropic Console with a monthly spend limit).
    - `SITE_SECRET`: a long random string. The relay's `/admin` page shows one you can copy until this is set.
    - `ADMIN_PASSWORD`: a password you'll use to make connection codes.
